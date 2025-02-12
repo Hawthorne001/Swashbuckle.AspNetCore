@@ -87,6 +87,31 @@
         "x-purpose": "test"
       }
     },
+    "/products/all": {
+      "get": {
+        "tags": [
+          "CrudActions"
+        ],
+        "summary": "Get all products",
+        "description": "```\r\n            {\r\n              \"Id\":1,\r\n              \"Description\":\"\",\r\n              \"Status\": 0,\r\n              \"Status2\": 1\r\n            }\r\n```",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-purpose": "test"
+      }
+    },
     "/products/{id}": {
       "get": {
         "tags": [
@@ -174,6 +199,7 @@
           "CrudActions"
         ],
         "summary": "Updates some properties of a specific product",
+        "description": "\r\nOnly provided properties will be updated,                    other remain unchanged.\r\n\r\nIdentifier must be non-default value\r\n\r\nBody must be specified",
         "operationId": "PatchProduct",
         "parameters": [
           {
@@ -580,6 +606,7 @@
         "tags": [
           "FromFormParams"
         ],
+        "summary": "Form parameters with description",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
@@ -587,14 +614,26 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Summary for Name",
+                    "example": "MyName"
                   },
                   "phoneNumbers": {
                     "type": "array",
                     "items": {
                       "type": "integer",
                       "format": "int32"
-                    }
+                    },
+                    "description": "Sumary for PhoneNumbers"
+                  },
+                  "formFile": {
+                    "type": "string",
+                    "description": "Description for file",
+                    "format": "binary"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Description for Text"
                   }
                 }
               },
@@ -603,6 +642,12 @@
                   "style": "form"
                 },
                 "phoneNumbers": {
+                  "style": "form"
+                },
+                "formFile": {
+                  "style": "form"
+                },
+                "text": {
                   "style": "form"
                 }
               }
@@ -627,9 +672,6 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "required": [
-                  "country"
-                ],
                 "type": "object",
                 "properties": {
                   "phoneNumbers": {
@@ -638,26 +680,78 @@
                       "type": "integer",
                       "format": "int32"
                     }
-                  },
-                  "country": {
-                    "type": "string",
-                    "description": "3-letter ISO country code"
-                  },
-                  "city": {
-                    "type": "string",
-                    "description": "Name of city",
-                    "default": "Seattle"
                   }
                 }
               },
               "encoding": {
                 "phoneNumbers": {
                   "style": "form"
-                },
-                "country": {
+                }
+              }
+            }
+          },
+          "x-purpose": "test"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-purpose": "test"
+      }
+    },
+    "/registrationsWithEnumParameter": {
+      "post": {
+        "tags": [
+          "FromFormParams"
+        ],
+        "summary": "Form parameters with description",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Summary for Name",
+                    "example": "MyName"
+                  },
+                  "phoneNumbers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "description": "Sumary for PhoneNumbers"
+                  },
+                  "logLevel": {
+                    "$ref": "#/components/schemas/LogLevel"
+                  },
+                  "formFile": {
+                    "type": "string",
+                    "description": "Description for file",
+                    "format": "binary"
+                  },
+                  "dateTimeKind": {
+                    "$ref": "#/components/schemas/DateTimeKind"
+                  }
+                }
+              },
+              "encoding": {
+                "name": {
                   "style": "form"
                 },
-                "city": {
+                "phoneNumbers": {
+                  "style": "form"
+                },
+                "logLevel": {
+                  "style": "form"
+                },
+                "formFile": {
+                  "style": "form"
+                },
+                "dateTimeKind": {
                   "style": "form"
                 }
               }
@@ -743,11 +837,53 @@
                 "type": "string"
               }
             }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": true,
+            "style": "deepObject",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "OK"
+          }
+        },
+        "x-purpose": "test"
+      }
+    },
+    "/Issue3013/Get": {
+      "get": {
+        "tags": [
+          "Issue3013"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResponse"
+                }
+              }
+            }
           }
         },
         "x-purpose": "test"
@@ -1147,34 +1283,29 @@
         "parameters": [
           {
             "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Store"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Store"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Store"
-              }
-            }
-          },
-          "x-purpose": "test"
-        },
         "responses": {
           "200": {
             "description": "OK"
@@ -1280,12 +1411,34 @@
         },
         "additionalProperties": false
       },
+      "DateTimeKind": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DiscountType": {
         "enum": [
           "Percentage",
           "Amount"
         ],
         "type": "string"
+      },
+      "LogLevel": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "Order": {
         "type": "object",
@@ -1425,6 +1578,29 @@
           "location": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestResponse": {
+        "type": "object",
+        "properties": {
+          "foo": {
+            "$ref": "#/components/schemas/TestStruct"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestStruct": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "b": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

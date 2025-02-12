@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
-#if NETSTANDARD2_0
+#if NETSTANDARD
 using IWebHostEnvironment = Microsoft.AspNetCore.Hosting.IHostingEnvironment;
 #endif
 
@@ -34,17 +34,57 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
             // Create and add any filters that were specified through the FilterDescriptor lists ...
 
-            _swaggerGenOptions.ParameterFilterDescriptors.ForEach(
-                filterDescriptor => options.ParameterFilters.Add(GetOrCreateFilter<IParameterFilter>(filterDescriptor)));
+            foreach (var filterDescriptor in _swaggerGenOptions.ParameterFilterDescriptors)
+            {
+                if (filterDescriptor.IsAssignableTo(typeof(IParameterFilter)))
+                {
+                    options.ParameterFilters.Add(GetOrCreateFilter<IParameterFilter>(filterDescriptor));
+                }
 
-            _swaggerGenOptions.RequestBodyFilterDescriptors.ForEach(
-                filterDescriptor => options.RequestBodyFilters.Add(GetOrCreateFilter<IRequestBodyFilter>(filterDescriptor)));
+                if (filterDescriptor.IsAssignableTo(typeof(IParameterAsyncFilter)))
+                {
+                    options.ParameterAsyncFilters.Add(GetOrCreateFilter<IParameterAsyncFilter>(filterDescriptor));
+                }
+            }
 
-            _swaggerGenOptions.OperationFilterDescriptors.ForEach(
-                filterDescriptor => options.OperationFilters.Add(GetOrCreateFilter<IOperationFilter>(filterDescriptor)));
+            foreach (var filterDescriptor in _swaggerGenOptions.RequestBodyFilterDescriptors)
+            {
+                if (filterDescriptor.IsAssignableTo(typeof(IRequestBodyFilter)))
+                {
+                    options.RequestBodyFilters.Add(GetOrCreateFilter<IRequestBodyFilter>(filterDescriptor));
+                }
 
-            _swaggerGenOptions.DocumentFilterDescriptors.ForEach(
-                filterDescriptor => options.DocumentFilters.Add(GetOrCreateFilter<IDocumentFilter>(filterDescriptor)));
+                if (filterDescriptor.IsAssignableTo(typeof(IRequestBodyAsyncFilter)))
+                {
+                    options.RequestBodyAsyncFilters.Add(GetOrCreateFilter<IRequestBodyAsyncFilter>(filterDescriptor));
+                }
+            }
+
+            foreach (var filterDescriptor in _swaggerGenOptions.OperationFilterDescriptors)
+            {
+                if (filterDescriptor.IsAssignableTo(typeof(IOperationFilter)))
+                {
+                    options.OperationFilters.Add(GetOrCreateFilter<IOperationFilter>(filterDescriptor));
+                }
+
+                if (filterDescriptor.IsAssignableTo(typeof(IOperationAsyncFilter)))
+                {
+                    options.OperationAsyncFilters.Add(GetOrCreateFilter<IOperationAsyncFilter>(filterDescriptor));
+                }
+            }
+
+            foreach (var filterDescriptor in _swaggerGenOptions.DocumentFilterDescriptors)
+            {
+                if (filterDescriptor.IsAssignableTo(typeof(IDocumentFilter)))
+                {
+                    options.DocumentFilters.Add(GetOrCreateFilter<IDocumentFilter>(filterDescriptor));
+                }
+
+                if (filterDescriptor.IsAssignableTo(typeof(IDocumentAsyncFilter)))
+                {
+                    options.DocumentAsyncFilters.Add(GetOrCreateFilter<IDocumentAsyncFilter>(filterDescriptor));
+                }
+            }
 
             if (!options.SwaggerDocs.Any())
             {
@@ -76,6 +116,8 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             target.RequestBodyFilters = new List<IRequestBodyFilter>(source.RequestBodyFilters);
             target.RequestBodyAsyncFilters = new List<IRequestBodyAsyncFilter>(source.RequestBodyAsyncFilters);
             target.SecuritySchemesSelector = source.SecuritySchemesSelector;
+            target.PathGroupSelector = source.PathGroupSelector;
+            target.XmlCommentEndOfLine = source.XmlCommentEndOfLine;
         }
 
         private TFilter GetOrCreateFilter<TFilter>(FilterDescriptor filterDescriptor)

@@ -1,7 +1,11 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Routing.Constraints;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateSlimBuilder(args);
+
+builder.Services.Configure<RouteOptions>(
+    options => options.SetParameterPolicy<RegexInlineRouteConstraint>("regex"));
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -41,6 +45,8 @@ todosApi.MapGet("/{id}", (int id) =>
 
 app.UseSwagger();
 app.UseSwaggerUI();
+app.UseReDoc();
+
 app.MapSwagger();
 
 app.Run();
@@ -49,3 +55,13 @@ internal record Todo(int Id, string? Title, DateOnly? DueBy = null, bool IsCompl
 
 [JsonSerializable(typeof(Todo[]))]
 internal partial class AppJsonSerializerContext : JsonSerializerContext;
+
+namespace WebApi.Aot
+{
+    /// <summary>
+    /// Expose the Program class for use with <c>WebApplicationFactory</c>
+    /// </summary>
+    public partial class Program
+    {
+    }
+}

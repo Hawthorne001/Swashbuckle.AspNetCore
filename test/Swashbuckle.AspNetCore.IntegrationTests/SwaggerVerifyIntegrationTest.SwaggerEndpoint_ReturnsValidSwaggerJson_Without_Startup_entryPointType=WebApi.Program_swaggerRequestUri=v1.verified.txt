@@ -48,6 +48,258 @@
         }
       }
     },
+    "/annotations/singleForm": {
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonAnnotated"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonAnnotated"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotations/multipleForms": {
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PersonAnnotated"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AddressAnnotated"
+                  }
+                ]
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PersonAnnotated"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AddressAnnotated"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotations/IFromFileAndString": {
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file",
+                  "tags"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "description": "Description for File",
+                    "format": "binary"
+                  },
+                  "tags": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                },
+                "tags": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotations/IFromFileAndEnum": {
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "dateTimeKind",
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "dateTimeKind": {
+                    "$ref": "#/components/schemas/DateTimeKind"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                },
+                "dateTimeKind": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotations/IFromObjectAndString": {
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PersonAnnotated"
+                  },
+                  {
+                    "required": [
+                      "tags"
+                    ],
+                    "type": "object",
+                    "properties": {
+                      "tags": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              },
+              "encoding": {
+                "tags": {
+                  "style": "form"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PersonAnnotated"
+                  },
+                  {
+                    "required": [
+                      "tags"
+                    ],
+                    "type": "object",
+                    "properties": {
+                      "tags": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              },
+              "encoding": {
+                "tags": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/annotations/AsParameters": {
       "get": {
         "tags": [
@@ -170,6 +422,35 @@
         }
       }
     },
+    "/TypeWithTryParse/{tryParse}": {
+      "get": {
+        "tags": [
+          "WebApi"
+        ],
+        "parameters": [
+          {
+            "name": "tryParse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/WithOpenApi/weatherforecast": {
       "get": {
         "tags": [
@@ -245,6 +526,17 @@
       "post": {
         "tags": [
           "WithOpenApi"
+        ],
+        "parameters": [
+          {
+            "name": "queryParameter",
+            "in": "query",
+            "description": "queryParameter Description",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -359,6 +651,180 @@
         }
       }
     },
+    "/WithOpenApi/IFromFileAndString": {
+      "post": {
+        "tags": [
+          "WithOpenApi"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file",
+                  "tags"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "tags": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                },
+                "tags": {
+                  "style": "form"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/WithOpenApi/IFromFileAndEnum": {
+      "post": {
+        "tags": [
+          "WithOpenApi"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "dateTimeKind",
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "dateTimeKind": {
+                    "$ref": "#/components/schemas/DateTimeKind"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                },
+                "dateTimeKind": {
+                  "style": "form"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/WithOpenApi/IFromObjectAndString": {
+      "post": {
+        "tags": [
+          "WithOpenApi"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  {
+                    "required": [
+                      "tags"
+                    ],
+                    "type": "object",
+                    "properties": {
+                      "tags": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              },
+              "encoding": {
+                "tags": {
+                  "style": "form"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  {
+                    "required": [
+                      "tags"
+                    ],
+                    "type": "object",
+                    "properties": {
+                      "tags": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              },
+              "encoding": {
+                "tags": {
+                  "style": "form"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/XmlComments/Car/{id}": {
       "get": {
         "tags": [
@@ -400,6 +866,29 @@
         "properties": {
           "street": {
             "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "zipCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AddressAnnotated": {
+        "type": "object",
+        "properties": {
+          "street": {
+            "type": "string",
+            "description": "Description for Street",
             "nullable": true
           },
           "city": {
@@ -483,6 +972,7 @@
         "properties": {
           "currencyFrom": {
             "type": "string",
+            "description": "Currency From",
             "nullable": true
           },
           "currencyTo": {
@@ -528,6 +1018,10 @@
               "$ref": "#/components/schemas/CurrenciesRate"
             },
             "nullable": true
+          },
+          "isUpdated": {
+            "type": "boolean",
+            "readOnly": true
           }
         },
         "additionalProperties": false
@@ -541,6 +1035,22 @@
           },
           "lastName": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PersonAnnotated": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "description": "Description for FirstName",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Description for LastName",
             "nullable": true
           }
         },

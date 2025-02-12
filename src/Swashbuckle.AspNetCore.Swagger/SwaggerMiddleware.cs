@@ -14,7 +14,7 @@ using Microsoft.OpenApi.Writers;
 
 namespace Swashbuckle.AspNetCore.Swagger
 {
-    public class SwaggerMiddleware
+    internal sealed class SwaggerMiddleware
     {
         private readonly RequestDelegate _next;
         private readonly SwaggerOptions _options;
@@ -33,6 +33,7 @@ namespace Swashbuckle.AspNetCore.Swagger
         }
 
 #if !NETSTANDARD
+        [ActivatorUtilitiesConstructor]
         public SwaggerMiddleware(
             RequestDelegate next,
             SwaggerOptions options,
@@ -99,7 +100,11 @@ namespace Swashbuckle.AspNetCore.Swagger
         {
             documentName = null;
             extension = null;
-            if (request.Method != "GET") return false;
+
+            if (!HttpMethods.IsGet(request.Method))
+            {
+                return false;
+            }
 
             var routeValues = new RouteValueDictionary();
             if (_requestMatcher.TryMatch(request.Path, routeValues))

@@ -1,17 +1,26 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi.Models;
+using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Xml.XPath;
-using Microsoft.OpenApi.Models;
 
 namespace Swashbuckle.AspNetCore.SwaggerGen
 {
     public class XmlCommentsOperationFilter : IOperationFilter
     {
-        private readonly XPathNavigator _xmlNavigator;
+        private readonly IReadOnlyDictionary<string, XPathNavigator> _xmlDocMembers;
+        private readonly SwaggerGeneratorOptions _options;
 
-        public XmlCommentsOperationFilter(XPathDocument xmlDoc)
+        public XmlCommentsOperationFilter(XPathDocument xmlDoc) : this(XmlCommentsDocumentHelper.CreateMemberDictionary(xmlDoc), null)
         {
-            _xmlNavigator = xmlDoc.CreateNavigator();
+        }
+
+        [ActivatorUtilitiesConstructor]
+        internal XmlCommentsOperationFilter(IReadOnlyDictionary<string, XPathNavigator> xmlDocMembers, SwaggerGeneratorOptions options)
+        {
+            _xmlDocMembers = xmlDocMembers;
+            _options = options;
         }
 
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
@@ -32,26 +41,28 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         private void ApplyControllerTags(OpenApiOperation operation, Type controllerType)
         {
             var typeMemberName = XmlCommentsNodeNameHelper.GetMemberNameForType(controllerType);
-            var responseNodes = _xmlNavigator.Select($"/doc/members/member[@name='{typeMemberName}']/response");
+
+            if (!_xmlDocMembers.TryGetValue(typeMemberName, out var methodNode)) return;
+
+            var responseNodes = methodNode.SelectChildren("response");
             ApplyResponseTags(operation, responseNodes);
         }
 
         private void ApplyMethodTags(OpenApiOperation operation, MethodInfo methodInfo)
         {
             var methodMemberName = XmlCommentsNodeNameHelper.GetMemberNameForMethod(methodInfo);
-            var methodNode = _xmlNavigator.SelectSingleNode($"/doc/members/member[@name='{methodMemberName}']");
 
-            if (methodNode == null) return;
+            if (!_xmlDocMembers.TryGetValue(methodMemberName, out var methodNode)) return;
 
-            var summaryNode = methodNode.SelectSingleNode("summary");
+            var summaryNode = methodNode.SelectFirstChild("summary");
             if (summaryNode != null)
-                operation.Summary = XmlCommentsTextHelper.Humanize(summaryNode.InnerXml);
+                operation.Summary = XmlCommentsTextHelper.Humanize(summaryNode.InnerXml, _options?.XmlCommentEndOfLine);
 
-            var remarksNode = methodNode.SelectSingleNode("remarks");
+            var remarksNode = methodNode.SelectFirstChild("remarks");
             if (remarksNode != null)
-                operation.Description = XmlCommentsTextHelper.Humanize(remarksNode.InnerXml);
+                operation.Description = XmlCommentsTextHelper.Humanize(remarksNode.InnerXml, _options?.XmlCommentEndOfLine);
 
-            var responseNodes = methodNode.Select("response");
+            var responseNodes = methodNode.SelectChildren("response");
             ApplyResponseTags(operation, responseNodes);
         }
 
@@ -59,12 +70,14 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         {
             while (responseNodes.MoveNext())
             {
-                var code = responseNodes.Current.GetAttribute("code", "");
-                var response = operation.Responses.TryGetValue(code, out var operationResponse)
-                    ? operationResponse
-                    : operation.Responses[code] = new OpenApiResponse();
+                var code = responseNodes.Current.GetAttribute("code");
+                if (!operation.Responses.TryGetValue(code, out var response))
+                {
+                    response = new OpenApiResponse();
+                    operation.Responses[code] = response;
+                }
 
-                response.Description = XmlCommentsTextHelper.Humanize(responseNodes.Current.InnerXml);
+                response.Description = XmlCommentsTextHelper.Humanize(responseNodes.Current.InnerXml, _options?.XmlCommentEndOfLine);
             }
         }
     }

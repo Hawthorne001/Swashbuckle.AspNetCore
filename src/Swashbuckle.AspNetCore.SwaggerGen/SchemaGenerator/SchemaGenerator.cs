@@ -10,6 +10,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 
@@ -20,10 +21,21 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         private readonly SchemaGeneratorOptions _generatorOptions;
         private readonly ISerializerDataContractResolver _serializerDataContractResolver;
 
-        public SchemaGenerator(SchemaGeneratorOptions generatorOptions, ISerializerDataContractResolver serializerDataContractResolver)
+        public SchemaGenerator(
+            SchemaGeneratorOptions generatorOptions,
+            ISerializerDataContractResolver serializerDataContractResolver)
         {
             _generatorOptions = generatorOptions;
             _serializerDataContractResolver = serializerDataContractResolver;
+        }
+
+        [Obsolete($"{nameof(IOptions<MvcOptions>)} is no longer used. This constructor will be removed in a future major release.")]
+        public SchemaGenerator(
+            SchemaGeneratorOptions generatorOptions,
+            ISerializerDataContractResolver serializerDataContractResolver,
+            IOptions<MvcOptions> mvcOptions)
+            : this(generatorOptions, serializerDataContractResolver)
+        {
         }
 
         public OpenApiSchema GenerateSchema(
@@ -91,10 +103,26 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                 }
 
                 // NullableAttribute behaves differently for Dictionaries
-                if (schema.AdditionalPropertiesAllowed && modelType.IsGenericType &&
-                    modelType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+                if (schema.AdditionalPropertiesAllowed && modelType.IsGenericType)
                 {
-                    schema.AdditionalProperties.Nullable = !memberInfo.IsDictionaryValueNonNullable();
+                    var genericTypes = modelType
+                        .GetInterfaces()
+#if NETSTANDARD2_0
+                        .Concat([modelType])
+#else
+                        .Append(modelType)
+#endif
+                        .Where(t => t.IsGenericType)
+                        .ToArray();
+
+                    var isDictionaryType =
+                        genericTypes.Any(t => t.GetGenericTypeDefinition() == typeof(IDictionary<,>)) ||
+                        genericTypes.Any(t => t.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>));
+
+                    if (isDictionaryType)
+                    {
+                        schema.AdditionalProperties.Nullable = !memberInfo.IsDictionaryValueNonNullable();
+                    }
                 }
 
                 schema.ApplyValidationAttributes(customAttributes);
@@ -204,7 +232,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             typeof(IFormFile),
             typeof(FileResult),
             typeof(System.IO.Stream),
-#if NETCOREAPP3_0_OR_GREATER
+#if !NETSTANDARD
             typeof(System.IO.Pipelines.PipeReader),
 #endif
         ];
@@ -285,7 +313,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             };
 
 #pragma warning disable CS0618 // Type or member is obsolete
-            // For backcompat only - EnumValues is obsolete
+            // For backwards compatibility only - EnumValues is obsolete
             if (dataContract.EnumValues != null)
             {
                 schema.Enum = dataContract.EnumValues
@@ -326,27 +354,27 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
         private OpenApiSchema CreateDictionarySchema(DataContract dataContract, SchemaRepository schemaRepository)
         {
-            if (dataContract.DictionaryKeys != null)
+            var knownKeysProperties = dataContract.DictionaryKeys?.ToDictionary(
+                name => name,
+                _ => GenerateSchema(dataContract.DictionaryValueType, schemaRepository));
+
+            if (knownKeysProperties?.Count > 0)
             {
                 // This is a special case where the set of key values is known (e.g. if the key type is an enum)
                 return new OpenApiSchema
                 {
                     Type = "object",
-                    Properties = dataContract.DictionaryKeys.ToDictionary(
-                        name => name,
-                        name => GenerateSchema(dataContract.DictionaryValueType, schemaRepository)),
-                    AdditionalPropertiesAllowed = false,
+                    Properties = knownKeysProperties,
+                    AdditionalPropertiesAllowed = false
                 };
             }
-            else
+
+            return new OpenApiSchema
             {
-                return new OpenApiSchema
-                {
-                    Type = "object",
-                    AdditionalPropertiesAllowed = true,
-                    AdditionalProperties = GenerateSchema(dataContract.DictionaryValueType, schemaRepository)
-                };
-            }
+                Type = "object",
+                AdditionalPropertiesAllowed = true,
+                AdditionalProperties = GenerateSchema(dataContract.DictionaryValueType, schemaRepository)
+            };
         }
 
         private OpenApiSchema CreateObjectSchema(DataContract dataContract, SchemaRepository schemaRepository)
@@ -410,8 +438,12 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                     ? GenerateSchemaForMember(dataProperty.MemberType, schemaRepository, dataProperty.MemberInfo, dataProperty)
                     : GenerateSchemaForType(dataProperty.MemberType, schemaRepository);
 
+                var markNonNullableTypeAsRequired = _generatorOptions.NonNullableReferenceTypesAsRequired
+                    && (dataProperty.MemberInfo?.IsNonNullableReferenceType() ?? false);
+
                 if ((
                     dataProperty.IsRequired
+                    || markNonNullableTypeAsRequired
                     || customAttributes.OfType<RequiredAttribute>().Any()
 #if NET7_0_OR_GREATER
                     || customAttributes.OfType<System.Runtime.CompilerServices.RequiredMemberAttribute>().Any()
@@ -442,12 +474,18 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             baseTypeDataContract = null;
 
             var baseType = dataContract.UnderlyingType.BaseType;
+            while (baseType != null && baseType != typeof(object))
+            {
+                if (_generatorOptions.SubTypesSelector(baseType).Contains(dataContract.UnderlyingType))
+                {
+                    baseTypeDataContract = GetDataContractFor(baseType);
+                    return true;
+                }
 
-            if (baseType == null || baseType == typeof(object) || !_generatorOptions.SubTypesSelector(baseType).Contains(dataContract.UnderlyingType))
-                return false;
+                baseType = baseType.BaseType;
+            }
 
-            baseTypeDataContract = GetDataContractFor(baseType);
-            return true;
+            return false;
         }
 
         private bool TryGetDiscriminatorFor(

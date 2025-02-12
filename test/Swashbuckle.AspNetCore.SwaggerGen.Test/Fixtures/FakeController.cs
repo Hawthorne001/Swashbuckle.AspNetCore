@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Swashbuckle.AspNetCore.Annotations;
 using Swashbuckle.AspNetCore.SwaggerGen.Test.Fixtures;
+using Swashbuckle.AspNetCore.TestSupport;
 
 namespace Swashbuckle.AspNetCore.SwaggerGen.Test
 {
@@ -47,6 +48,9 @@ namespace Swashbuckle.AspNetCore.SwaggerGen.Test
         { }
 
         public void ActionWithIntParameterWithDefaultValueAttribute([DefaultValue(3)] int param)
+        { }
+
+        public void ActionWithIntFromQueryParameter([FromQuery] int param)
         { }
 
         public void ActionWithIntParameterWithRequiredAttribute([Required] int param)
@@ -108,6 +112,10 @@ namespace Swashbuckle.AspNetCore.SwaggerGen.Test
         public void ActionHavingFromFormAttributeButNotWithIFormFile([FromForm] string param1, IFormFile param2)
         { }
         public void ActionHavingFromFormAttributeWithSwaggerIgnore([FromForm] SwaggerIngoreAnnotatedType param1)
+        { }
+        public void ActionHavingEnum(IntEnum param1)
+        { }
+        public void ActionHavingFromFormObjectAndString([FromForm] SwaggerIngoreAnnotatedType param1, [FromForm] string param2)
         { }
     }
 }

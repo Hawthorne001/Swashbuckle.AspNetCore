@@ -9,11 +9,16 @@ using ReDocApp = ReDoc;
 namespace Swashbuckle.AspNetCore.IntegrationTests
 {
     [Collection("TestSite")]
-    public class SwaggerVerifyIntegrationTest
+    public partial class SwaggerVerifyIntegrationTest
     {
         [Theory]
+#if !NET6_0
+        [InlineData(typeof(Basic.Startup), "/swagger/v1/swagger.json")]
+        [InlineData(typeof(NSwagClientExample.Startup), "/swagger/v1/swagger.json")]
+#endif
         [InlineData(typeof(CliExample.Startup), "/swagger/v1/swagger_net8.0.json")]
         [InlineData(typeof(ConfigFromFile.Startup), "/swagger/v1/swagger.json")]
+        [InlineData(typeof(CustomDocumentSerializer.Startup), "/swagger/v1/swagger.json")]
         [InlineData(typeof(CustomUIConfig.Startup), "/swagger/v1/swagger.json")]
         [InlineData(typeof(CustomUIIndex.Startup), "/swagger/v1/swagger.json")]
         [InlineData(typeof(GenericControllers.Startup), "/swagger/v1/swagger.json")]
@@ -31,28 +36,59 @@ namespace Swashbuckle.AspNetCore.IntegrationTests
 
             using var swaggerResponse = await client.GetAsync(swaggerRequestUri);
             var swagger = await swaggerResponse.Content.ReadAsStringAsync();
+
+            await Verifier.Verify(NormalizeLineBreaks(swagger))
+                .UseParameters(startupType, GetVersion(swaggerRequestUri));
+        }
+
+        [Fact]
+        public async Task SwaggerEndpoint_ReturnsValidSwaggerJson_ForAutofaq()
+        {
+            var startupType = typeof(CliExampleWithFactory.Startup);
+            const string swaggerRequestUri = "/swagger/v1/swagger_net8.0.json";
+
+            var testSite = new TestSiteAutofaq(startupType);
+            using var client = testSite.BuildClient();
+
+            using var swaggerResponse = await client.GetAsync(swaggerRequestUri);
+            var swagger = await swaggerResponse.Content.ReadAsStringAsync();
             await Verifier.Verify(swagger).UseParameters(startupType, GetVersion(swaggerRequestUri));
         }
 
+#if NET6_0
+        [Theory]
+        [InlineData(typeof(Basic.Startup), "/swagger/v1/swagger.json")]
+        [InlineData(typeof(NSwagClientExample.Startup), "/swagger/v1/swagger.json")]
+        public async Task SwaggerEndpoint_ReturnsValidSwaggerJson_DotNet6(
+            Type startupType,
+            string swaggerRequestUri)
+        {
+            var testSite = new TestSite(startupType);
+            using var client = testSite.BuildClient();
+
+            using var swaggerResponse = await client.GetAsync(swaggerRequestUri);
+            var swagger = await swaggerResponse.Content.ReadAsStringAsync();
+            await Verifier.Verify(swagger).UseParameters(startupType, GetVersion(swaggerRequestUri));
+        }
+#endif
+
+        [Theory]
+        [InlineData(typeof(MinimalApp.Program), "/swagger/v1/swagger.json")]
+        [InlineData(typeof(TopLevelSwaggerDoc.Program), "/swagger/v1.json")]
 #if NET8_0_OR_GREATER
-        [Theory]
-        [InlineData("/swagger/v1/swagger.json")]
-        public async Task SwaggerEndpoint_ReturnsValidSwaggerJson_For_WebApi(
+        [InlineData(typeof(MvcWithNullable.Program), "/swagger/v1/swagger.json")]
+        [InlineData(typeof(WebApi.Program), "/swagger/v1/swagger.json")]
+        [InlineData(typeof(WebApi.Aot.Program), "/swagger/v1/swagger.json")]
+#endif
+        public async Task SwaggerEndpoint_ReturnsValidSwaggerJson_Without_Startup(
+            Type entryPointType,
             string swaggerRequestUri)
         {
-            var swaggerResponse = await SwaggerEndpointReturnsValidSwaggerJson<WebApi.Program>(swaggerRequestUri);
-            await Verifier.Verify(swaggerResponse).UseParameters(GetVersion(swaggerRequestUri));
+            var swaggerResponse = await SwaggerEndpointReturnsValidSwaggerJson(entryPointType, swaggerRequestUri);
+            await Verifier.Verify(swaggerResponse).UseParameters(entryPointType, GetVersion(swaggerRequestUri));
         }
 
-        [Theory]
-        [InlineData("/swagger/v1/swagger.json")]
-        public async Task SwaggerEndpoint_ReturnsValidSwaggerJson_For_Mvc(
-            string swaggerRequestUri)
-        {
-            var swaggerResponse = await SwaggerEndpointReturnsValidSwaggerJson<MvcWithNullable.Program>(swaggerRequestUri);
-            await Verifier.Verify(swaggerResponse).UseParameters(GetVersion(swaggerRequestUri));
-        }
-
+#if NET8_0_OR_GREATER
         [Fact]
         public async Task TypesAreRenderedCorrectly()
         {
@@ -62,22 +98,40 @@ namespace Swashbuckle.AspNetCore.IntegrationTests
             var swaggerResponse = await SwaggerResponse(client, "/swagger/v1/swagger.json");
             await Verifier.Verify(swaggerResponse);
         }
+#endif
 
-        private static async Task<string> SwaggerEndpointReturnsValidSwaggerJson<TEntryPoint>(string swaggerRequestUri)
-            where TEntryPoint : class
+        private static async Task<string> SwaggerEndpointReturnsValidSwaggerJson(Type entryPointType, string swaggerRequestUri)
         {
-            using var application = new TestApplication<TEntryPoint>();
-            using var client = application.CreateDefaultClient();
-
+            using var client = SwaggerIntegrationTests.GetHttpClientForTestApplication(entryPointType);
             return await SwaggerResponse(client, swaggerRequestUri);
         }
-#endif
+
         private static async Task<string> SwaggerResponse(HttpClient client, string swaggerRequestUri)
         {
             using var swaggerResponse = await client.GetAsync(swaggerRequestUri);
             var contentStream = await swaggerResponse.Content.ReadAsStringAsync();
             return contentStream;
         }
-        private static string GetVersion(string swaggerUi) => Regex.Match(swaggerUi, "/\\w+/([\\w+\\d+.-]+)/").Groups[1].Value;
+
+        /// <summary>
+        /// Normalize "\n" strings into "\r\n" which is expected linebreak in Verify verified.txt files.
+        /// </summary>
+        private static string NormalizeLineBreaks(string swagger)
+        {
+            return UnixNewLineRegex().Replace(swagger, "\\r\\n");
+        }
+
+        private static string GetVersion(string swaggerUi) =>
+#if NET6_0
+            Regex.Match(swaggerUi, "/\\w+/([\\w+\\d+.-]+)/").Groups[1].Value;
+#else
+            VersionRegex().Match(swaggerUi).Groups[1].Value;
+
+        [GeneratedRegex("/\\w+/([\\w+\\d+.-]+)/")]
+        private static partial Regex VersionRegex();
+#endif
+
+        [GeneratedRegex(@"(?<!\\r)\\n")]
+        private static partial Regex UnixNewLineRegex();
     }
 }

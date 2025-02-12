@@ -49,7 +49,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
             // For non-controllers, prefer the IsRequired flag if we're not on netstandard 2.0, otherwise fallback to the default logic.
             return
-#if !NETSTANDARD2_0
+#if !NETSTANDARD
             apiParameter.IsRequired;
 #else
             IsRequired();
@@ -59,7 +59,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         public static ParameterInfo ParameterInfo(this ApiParameterDescription apiParameter)
         {
             var parameterDescriptor = apiParameter.ParameterDescriptor as
-#if NETCOREAPP2_2_OR_GREATER
+#if !NETSTANDARD
                 Microsoft.AspNetCore.Mvc.Infrastructure.IParameterInfoParameterDescriptor;
 #else
                 ControllerParameterDescriptor;
@@ -72,9 +72,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         {
             var modelMetadata = apiParameter.ModelMetadata;
 
-            return (modelMetadata?.ContainerType != null)
-                ? modelMetadata.ContainerType.GetProperty(modelMetadata.PropertyName)
-                : null;
+            return modelMetadata?.ContainerType?.GetProperty(modelMetadata.PropertyName);
         }
 
         public static IEnumerable<object> CustomAttributes(this ApiParameterDescription apiParameter)
@@ -103,18 +101,27 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
         internal static bool IsFromPath(this ApiParameterDescription apiParameter)
         {
-            return (apiParameter.Source == BindingSource.Path);
+            return apiParameter.Source == BindingSource.Path;
         }
 
         internal static bool IsFromBody(this ApiParameterDescription apiParameter)
         {
-            return (apiParameter.Source == BindingSource.Body);
+            return apiParameter.Source == BindingSource.Body;
         }
 
         internal static bool IsFromForm(this ApiParameterDescription apiParameter)
         {
+            bool isEnhancedModelMetadataSupported = true;
+
+#if NET9_0_OR_GREATER
+            if (AppContext.TryGetSwitch("Microsoft.AspNetCore.Mvc.ApiExplorer.IsEnhancedModelMetadataSupported", out var isEnabled))
+            {
+                isEnhancedModelMetadataSupported = isEnabled;
+            }
+#endif
+
             var source = apiParameter.Source;
-            var elementType = apiParameter.ModelMetadata?.ElementType;
+            var elementType = isEnhancedModelMetadataSupported ? apiParameter.ModelMetadata?.ElementType : null;
 
             return (source == BindingSource.Form || source == BindingSource.FormFile)
                 || (elementType != null && typeof(IFormFile).IsAssignableFrom(elementType));

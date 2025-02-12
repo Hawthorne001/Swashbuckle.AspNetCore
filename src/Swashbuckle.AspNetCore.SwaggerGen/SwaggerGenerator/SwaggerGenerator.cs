@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -56,7 +56,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             swaggerDoc.Paths = await GeneratePathsAsync(filterContext.ApiDescriptions, filterContext.SchemaRepository);
             swaggerDoc.Components.SecuritySchemes = await GetSecuritySchemesAsync();
 
-            // NOTE: Filter processing moved here so they may effect generated security schemes
+            // NOTE: Filter processing moved here so they may affect generated security schemes
             foreach (var filter in _options.DocumentAsyncFilters)
             {
                 await filter.ApplyAsync(swaggerDoc, filterContext, CancellationToken.None);
@@ -81,7 +81,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                 swaggerDoc.Paths = GeneratePaths(filterContext.ApiDescriptions, filterContext.SchemaRepository);
                 swaggerDoc.Components.SecuritySchemes = GetSecuritySchemesAsync().Result;
 
-                // NOTE: Filter processing moved here so they may effect generated security schemes
+                // NOTE: Filter processing moved here so they may affect generated security schemes
                 foreach (var filter in _options.DocumentFilters)
                 {
                     filter.Apply(swaggerDoc, filterContext);
@@ -199,7 +199,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         {
             var apiDescriptionsByPath = apiDescriptions
                 .OrderBy(_options.SortKeySelector)
-                .GroupBy(apiDesc => apiDesc.RelativePathSansParameterConstraints());
+                .GroupBy(_options.PathGroupSelector);
 
             var paths = new OpenApiPaths();
             foreach (var group in apiDescriptionsByPath)
@@ -284,10 +284,10 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             {
                 throw new SwaggerGeneratorException(string.Format(
                     "Conflicting method/path combination \"{0} {1}\" for actions - {2}. " +
-                    "Actions require a unique method/path combination for Swagger/OpenAPI 3.0. Use ConflictingActionsResolver as a workaround",
+                    "Actions require a unique method/path combination for Swagger/OpenAPI 2.0 and 3.0. Use ConflictingActionsResolver as a workaround or provide your own implementation of PathGroupSelector.",
                     httpMethod,
                     group.First().RelativePath,
-                    string.Join(",", group.Select(apiDesc => apiDesc.ActionDescriptor.DisplayName))));
+                    string.Join(", ", group.Select(apiDesc => apiDesc.ActionDescriptor.DisplayName))));
             }
 
             var apiDescription = (count > 1) ? _options.ConflictingActionsResolver(group) : group.Single();
@@ -312,7 +312,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         {
             OpenApiOperation operation =
 #if NET6_0_OR_GREATER
-                GenerateOpenApiOperationFromMetadata(apiDescription, schemaRepository);
+                await GenerateOpenApiOperationFromMetadataAsync(apiDescription, schemaRepository);
 #else
                 null;
 #endif
@@ -390,7 +390,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         }
 
 #if NET6_0_OR_GREATER
-        private OpenApiOperation GenerateOpenApiOperationFromMetadata(ApiDescription apiDescription, SchemaRepository schemaRepository)
+        private async Task<OpenApiOperation> GenerateOpenApiOperationFromMetadataAsync(ApiDescription apiDescription, SchemaRepository schemaRepository)
         {
             var metadata = apiDescription.ActionDescriptor?.EndpointMetadata;
             var operation = metadata?.OfType<OpenApiOperation>().SingleOrDefault();
@@ -406,71 +406,72 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                 var apiParameter = apiDescription.ParameterDescriptions.SingleOrDefault(desc => desc.Name == parameter.Name && !desc.IsFromBody() && !desc.IsFromForm() && !desc.IsIllegalHeaderParameter());
                 if (apiParameter is not null)
                 {
-                    parameter.Schema = GenerateSchema(
-                        apiParameter.Type,
-                        schemaRepository,
-                        apiParameter.PropertyInfo(),
-                        apiParameter.ParameterInfo(),
-                        apiParameter.RouteInfo);
+                    var (parameterAndContext, filterContext) = GenerateParameterAndContext(apiParameter, schemaRepository);
+                    parameter.Schema = parameterAndContext.Schema;
+                    parameter.Description ??= parameterAndContext.Description;
+
+                    foreach (var filter in _options.ParameterAsyncFilters)
+                    {
+                        await filter.ApplyAsync(parameter, filterContext, CancellationToken.None);
+                    }
+
+                    foreach (var filter in _options.ParameterFilters)
+                    {
+                        filter.Apply(parameter, filterContext);
+                    }
                 }
             }
 
-            var requestContentTypes = operation.RequestBody?.Content?.Values;
+            var requestContentTypes = operation.RequestBody?.Content?.Keys;
             if (requestContentTypes is not null)
             {
-                foreach (var content in requestContentTypes)
+                foreach (var contentType in requestContentTypes)
                 {
-                    content.Encoding = new Dictionary<string, OpenApiEncoding>();
-                    var requestParameters = apiDescription.ParameterDescriptions.Where(desc => desc.IsFromBody() || desc.IsFromForm());
-                    var countOfParameters = requestParameters.Count();
-                    if (countOfParameters > 0)
+                    var contentTypeValue = operation.RequestBody.Content[contentType];
+                    var fromFormParameters = apiDescription.ParameterDescriptions.Where(desc => desc.IsFromForm()).ToList();
+                    ApiParameterDescription bodyParameterDescription = null;
+                    if (fromFormParameters.Count > 0)
                     {
-                        if (countOfParameters == 1)
+                        var generatedContentTypeValue = GenerateRequestBodyFromFormParameters(
+                            apiDescription,
+                            schemaRepository,
+                            fromFormParameters,
+                            [contentType]).Content[contentType];
+
+                        contentTypeValue.Schema = generatedContentTypeValue.Schema;
+                        contentTypeValue.Encoding = generatedContentTypeValue.Encoding;
+                    }
+                    else
+                    {
+                        bodyParameterDescription = apiDescription.ParameterDescriptions.SingleOrDefault(desc => desc.IsFromBody());
+                        if (bodyParameterDescription is not null)
                         {
-                            var requestParameter = requestParameters.First();
-                            content.Schema = GenerateSchemaIncludingFormFile(requestParameter, GenerateSchema(
-                                requestParameter.ModelMetadata.ModelType,
+                            contentTypeValue.Schema = GenerateSchema(
+                                bodyParameterDescription.ModelMetadata.ModelType,
                                 schemaRepository,
-                                requestParameter.PropertyInfo(),
-                                requestParameter.ParameterInfo()), content);
-                        }
-                        else
-                        {
-                            content.Schema = new OpenApiSchema()
-                            {
-                                AllOf = requestParameters.Select(s =>
-                                    GenerateSchemaIncludingFormFile(s, GenerateSchema(
-                                    s.ModelMetadata.ModelType,
-                                    schemaRepository,
-                                    s.PropertyInfo(),
-                                    s.ParameterInfo()), content))
-                                .ToList()
-                            };
+                                bodyParameterDescription.PropertyInfo(),
+                                bodyParameterDescription.ParameterInfo());
                         }
                     }
 
-                    static OpenApiSchema GenerateSchemaIncludingFormFile(ApiParameterDescription apiParameterDescription, OpenApiSchema generatedSchema, OpenApiMediaType mediaType)
+                    if (fromFormParameters.Count > 0 || bodyParameterDescription is not null)
                     {
-                        if (generatedSchema.Reference is null && apiParameterDescription.IsFromForm())
-                        {
-                            mediaType.Encoding.Add(apiParameterDescription.Name, new OpenApiEncoding { Style = ParameterStyle.Form });
-                            if ((generatedSchema.Type == "string" && generatedSchema.Format == "binary")
-                                || (generatedSchema.Type == "array" && generatedSchema.Items.Type == "string" && generatedSchema.Items.Format == "binary"))
-                            {
-                                return new OpenApiSchema()
-                                {
-                                    Type = "object",
-                                    Properties = new Dictionary<string, OpenApiSchema>()
-                                    {
-                                        [apiParameterDescription.Name] = generatedSchema
-                                    },
-                                    Required = apiParameterDescription.IsRequired ? new SortedSet<string>() { apiParameterDescription.Name } : null
-                                };
-                            }
-                        }
-                        return generatedSchema;
-                    }
+                        var filterContext = new RequestBodyFilterContext(
+                            bodyParameterDescription: bodyParameterDescription,
+                            formParameterDescriptions: bodyParameterDescription is null ? fromFormParameters : null,
+                            schemaGenerator: _schemaGenerator,
+                            schemaRepository: schemaRepository);
 
+                        foreach (var filter in _options.RequestBodyAsyncFilters)
+                        {
+                            await filter.ApplyAsync(operation.RequestBody, filterContext, CancellationToken.None);
+                        }
+
+                        foreach (var filter in _options.RequestBodyFilters)
+                        {
+                            filter.Apply(operation.RequestBody, filterContext);
+                        }
+                    }
                 }
             }
 
@@ -568,14 +569,14 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
             var isRequired = apiParameter.IsRequiredParameter();
 
-            var type = apiParameter.Type;
+            var type = apiParameter.ModelMetadata?.ModelType;
 
             if (type is not null
                 && type == typeof(string)
-                && apiParameter.ModelMetadata?.ModelType is not null
-                && apiParameter.ModelMetadata.ModelType != type)
+                && apiParameter.Type is not null
+                && (Nullable.GetUnderlyingType(apiParameter.Type) ?? apiParameter.Type).IsEnum)
             {
-                type = apiParameter.ModelMetadata.ModelType;
+                type = apiParameter.Type;
             }
 
             var schema = (type != null)
@@ -601,8 +602,17 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                 In = location,
                 Required = isRequired,
                 Schema = schema,
-                Description = description
+                Description = description,
+                Style = GetParameterStyle(type, apiParameter.Source)
             };
+        }
+
+        private static ParameterStyle? GetParameterStyle(Type type, BindingSource source)
+        {
+            return source == BindingSource.Query && type.IsGenericType &&
+                   typeof(IEnumerable<KeyValuePair<string, string>>).IsAssignableFrom(type)
+                ? ParameterStyle.DeepObject
+                : null;
         }
 
         private (OpenApiParameter, ParameterFilterContext) GenerateParameterAndContext(
@@ -699,7 +709,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             }
             else if (formParameters.Count > 0)
             {
-                requestBody = GenerateRequestBodyFromFormParameters(apiDescription, schemaRepository, formParameters);
+                requestBody = GenerateRequestBodyFromFormParameters(apiDescription, schemaRepository, formParameters, null);
 
                 filterContext = new RequestBodyFilterContext(
                     bodyParameterDescription: null,
@@ -797,12 +807,20 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         private OpenApiRequestBody GenerateRequestBodyFromFormParameters(
             ApiDescription apiDescription,
             SchemaRepository schemaRepository,
-            IEnumerable<ApiParameterDescription> formParameters)
+            IEnumerable<ApiParameterDescription> formParameters,
+            IEnumerable<string> contentTypes)
         {
-            var contentTypes = InferRequestContentTypes(apiDescription);
-            contentTypes = contentTypes.Any() ? contentTypes : ["multipart/form-data"];
+            if (contentTypes is null)
+            {
+                contentTypes = InferRequestContentTypes(apiDescription);
+                contentTypes = contentTypes.Any() ? contentTypes : ["multipart/form-data"];
+            }
 
             var schema = GenerateSchemaFromFormParameters(formParameters, schemaRepository);
+
+            var totalProperties = schema.AllOf
+                ?.FirstOrDefault(s => s.Properties.Count > 0)
+                ?.Properties ?? schema.Properties;
 
             return new OpenApiRequestBody
             {
@@ -812,7 +830,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                         contentType => new OpenApiMediaType
                         {
                             Schema = schema,
-                            Encoding = schema.Properties.ToDictionary(
+                            Encoding = totalProperties.ToDictionary(
                                 entry => entry.Key,
                                 entry => new OpenApiEncoding { Style = ParameterStyle.Form }
                             )
@@ -827,13 +845,9 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         {
             var properties = new Dictionary<string, OpenApiSchema>();
             var requiredPropertyNames = new List<string>();
-
+            var ownSchemas = new List<OpenApiSchema>();
             foreach (var formParameter in formParameters)
             {
-                var name = _options.DescribeAllParametersInCamelCase
-                    ? formParameter.Name.ToCamelCase()
-                    : formParameter.Name;
-
                 var propertyInfo = formParameter.PropertyInfo();
                 if (!propertyInfo?.HasAttribute<SwaggerIgnoreAttribute>() ?? true)
                 {
@@ -845,19 +859,52 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                         formParameter.ParameterInfo())
                     : new OpenApiSchema { Type = "string" };
 
-                    properties.Add(name, schema);
-
-                    if (formParameter.IsRequiredParameter())
-                        requiredPropertyNames.Add(name);
+                    if (schema.Reference is null
+                    || (formParameter.ModelMetadata?.ModelType is not null && (Nullable.GetUnderlyingType(formParameter.ModelMetadata.ModelType) ?? formParameter.ModelMetadata.ModelType).IsEnum))
+                    {
+                        var name = _options.DescribeAllParametersInCamelCase
+                            ? formParameter.Name.ToCamelCase()
+                            : formParameter.Name;
+                        properties.Add(name, schema);
+                        if (formParameter.IsRequiredParameter())
+                        {
+                            requiredPropertyNames.Add(name);
+                        }
+                    }
+                    else
+                    {
+                        ownSchemas.Add(schema);
+                    }
                 }
             }
 
-            return new OpenApiSchema
+            if (ownSchemas.Count > 0)
             {
-                Type = "object",
-                Properties = properties,
-                Required = new SortedSet<string>(requiredPropertyNames)
-            };
+                bool isAllOf = ownSchemas.Count > 1 || (ownSchemas.Count > 0 && properties.Count > 0);
+                if (isAllOf)
+                {
+                    var allOfSchema = new OpenApiSchema()
+                    {
+                        AllOf = ownSchemas
+                    };
+                    if (properties.Count > 0)
+                    {
+                        allOfSchema.AllOf.Add(GenerateSchemaForProperties(properties, requiredPropertyNames));
+                    }
+                    return allOfSchema;
+                }
+                return ownSchemas.First();
+            }
+
+            return GenerateSchemaForProperties(properties, requiredPropertyNames);
+
+            static OpenApiSchema GenerateSchemaForProperties(Dictionary<string, OpenApiSchema> properties, List<string> requiredPropertyNames) =>
+                 new()
+                 {
+                     Type = "object",
+                     Properties = properties,
+                     Required = new SortedSet<string>(requiredPropertyNames)
+                 };
         }
 
         private OpenApiResponses GenerateResponses(
@@ -958,67 +1005,84 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
         private static readonly IReadOnlyCollection<KeyValuePair<string, string>> ResponseDescriptionMap =
         [
-            new KeyValuePair<string, string>("100", "Continue"),
-            new KeyValuePair<string, string>("101", "Switching Protocols"),
-            new KeyValuePair<string, string>("1\\d{2}", "Information"),
+            // Informational responses
+            new("100", "Continue"),
+            new("101", "Switching Protocols"),
+            new("102", "Processing"),
+            new("103", "Early Hints"),
+            new("1\\d{2}", "Information"),
 
-            new KeyValuePair<string, string>("200", "OK"),
-            new KeyValuePair<string, string>("201", "Created"),
-            new KeyValuePair<string, string>("202", "Accepted"),
-            new KeyValuePair<string, string>("203", "Non-Authoritative Information"),
-            new KeyValuePair<string, string>("204", "No Content"),
-            new KeyValuePair<string, string>("205", "Reset Content"),
-            new KeyValuePair<string, string>("206", "Partial Content"),
-            new KeyValuePair<string, string>("2\\d{2}", "Success"),
+            // Successful responses
+            new("200", "OK"),
+            new("201", "Created"),
+            new("202", "Accepted"),
+            new("203", "Non-Authoritative Information"),
+            new("204", "No Content"),
+            new("205", "Reset Content"),
+            new("206", "Partial Content"),
+            new("207", "Multi-Status"),
+            new("208", "Already Reported"),
+            new("226", "IM Used"),
+            new("2\\d{2}", "Success"),
 
-            new KeyValuePair<string, string>("300", "Multiple Choices"),
-            new KeyValuePair<string, string>("301", "Moved Permanently"),
-            new KeyValuePair<string, string>("302", "Found"),
-            new KeyValuePair<string, string>("303", "See Other"),
-            new KeyValuePair<string, string>("304", "Not Modified"),
-            new KeyValuePair<string, string>("305", "Use Proxy"),
-            new KeyValuePair<string, string>("307", "Temporary Redirect"),
-            new KeyValuePair<string, string>("308", "Permanent Redirect"),
-            new KeyValuePair<string, string>("3\\d{2}", "Redirect"),
+            // Redirection messages
+            new("300", "Multiple Choices"),
+            new("301", "Moved Permanently"),
+            new("302", "Found"),
+            new("303", "See Other"),
+            new("304", "Not Modified"),
+            new("305", "Use Proxy"),
+            new("307", "Temporary Redirect"),
+            new("308", "Permanent Redirect"),
+            new("3\\d{2}", "Redirect"),
 
-            new KeyValuePair<string, string>("400", "Bad Request"),
-            new KeyValuePair<string, string>("401", "Unauthorized"),
-            new KeyValuePair<string, string>("402", "Payment Required"),
-            new KeyValuePair<string, string>("403", "Forbidden"),
-            new KeyValuePair<string, string>("404", "Not Found"),
-            new KeyValuePair<string, string>("405", "Method Not Allowed"),
-            new KeyValuePair<string, string>("406", "Not Acceptable"),
-            new KeyValuePair<string, string>("407", "Proxy Authentication Required"),
-            new KeyValuePair<string, string>("408", "Request Timeout"),
-            new KeyValuePair<string, string>("409", "Conflict"),
-            new KeyValuePair<string, string>("410", "Gone"),
-            new KeyValuePair<string, string>("411", "Length Required"),
-            new KeyValuePair<string, string>("412", "Precondition Failed"),
-            new KeyValuePair<string, string>("413", "Content Too Large"),
-            new KeyValuePair<string, string>("414", "URI Too Long"),
-            new KeyValuePair<string, string>("415", "Unsupported Media Type"),
-            new KeyValuePair<string, string>("416", "Range Not Satisfiable"),
-            new KeyValuePair<string, string>("417", "Expectation Failed"),
-            new KeyValuePair<string, string>("421", "Misdirected Request"),
-            new KeyValuePair<string, string>("422", "Unprocessable Content"),
-            new KeyValuePair<string, string>("423", "Locked"),
-            new KeyValuePair<string, string>("424", "Failed Dependency"),
-            new KeyValuePair<string, string>("426", "Upgrade Required"),
-            new KeyValuePair<string, string>("428", "Precondition Required"),
-            new KeyValuePair<string, string>("429", "Too Many Requests"),
-            new KeyValuePair<string, string>("431", "Request Header Fields Too Large"),
-            new KeyValuePair<string, string>("451", "Unavailable For Legal Reasons"),
-            new KeyValuePair<string, string>("4\\d{2}", "Client Error"),
+            // Client error responses
+            new("400", "Bad Request"),
+            new("401", "Unauthorized"),
+            new("402", "Payment Required"),
+            new("403", "Forbidden"),
+            new("404", "Not Found"),
+            new("405", "Method Not Allowed"),
+            new("406", "Not Acceptable"),
+            new("407", "Proxy Authentication Required"),
+            new("408", "Request Timeout"),
+            new("409", "Conflict"),
+            new("410", "Gone"),
+            new("411", "Length Required"),
+            new("412", "Precondition Failed"),
+            new("413", "Content Too Large"),
+            new("414", "URI Too Long"),
+            new("415", "Unsupported Media Type"),
+            new("416", "Range Not Satisfiable"),
+            new("417", "Expectation Failed"),
+            new("418", "I'm a teapot"),
+            new("421", "Misdirected Request"),
+            new("422", "Unprocessable Content"),
+            new("423", "Locked"),
+            new("424", "Failed Dependency"),
+            new("425", "Too Early"),
+            new("426", "Upgrade Required"),
+            new("428", "Precondition Required"),
+            new("429", "Too Many Requests"),
+            new("431", "Request Header Fields Too Large"),
+            new("451", "Unavailable For Legal Reasons"),
+            new("4\\d{2}", "Client Error"),
 
-            new KeyValuePair<string, string>("500", "Internal Server Error"),
-            new KeyValuePair<string, string>("501", "Not Implemented"),
-            new KeyValuePair<string, string>("502", "Bad Gateway"),
-            new KeyValuePair<string, string>("503", "Service Unavailable"),
-            new KeyValuePair<string, string>("504", "Gateway Timeout"),
-            new KeyValuePair<string, string>("505", "HTTP Version Not Supported"),
-            new KeyValuePair<string, string>("5\\d{2}", "Server Error"),
+            // Server error responses
+            new("500", "Internal Server Error"),
+            new("501", "Not Implemented"),
+            new("502", "Bad Gateway"),
+            new("503", "Service Unavailable"),
+            new("504", "Gateway Timeout"),
+            new("505", "HTTP Version Not Supported"),
+            new("506", "Variant Also Negotiates"),
+            new("507", "Insufficient Storage"),
+            new("508", "Loop Detected"),
+            new("510", "Not Extended"),
+            new("511", "Network Authentication Required"),
+            new("5\\d{2}", "Server Error"),
 
-            new KeyValuePair<string, string>("default", "Error")
+            new("default", "Error")
         ];
 
 #if NET7_0_OR_GREATER

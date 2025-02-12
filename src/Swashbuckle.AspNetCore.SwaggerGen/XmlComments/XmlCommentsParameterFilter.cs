@@ -1,16 +1,25 @@
-﻿using System.Reflection;
-using System.Xml.XPath;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Xml.XPath;
 
 namespace Swashbuckle.AspNetCore.SwaggerGen
 {
     public class XmlCommentsParameterFilter : IParameterFilter
     {
-        private XPathNavigator _xmlNavigator;
+        private readonly IReadOnlyDictionary<string, XPathNavigator> _xmlDocMembers;
+        private readonly SwaggerGeneratorOptions _options;
 
-        public XmlCommentsParameterFilter(XPathDocument xmlDoc)
+        public XmlCommentsParameterFilter(XPathDocument xmlDoc) : this(XmlCommentsDocumentHelper.CreateMemberDictionary(xmlDoc), null)
         {
-            _xmlNavigator = xmlDoc.CreateNavigator();
+        }
+
+        [ActivatorUtilitiesConstructor]
+        internal XmlCommentsParameterFilter(IReadOnlyDictionary<string, XPathNavigator> xmlDocMembers, SwaggerGeneratorOptions options)
+        {
+            _xmlDocMembers = xmlDocMembers;
+            _options = options;
         }
 
         public void Apply(OpenApiParameter parameter, ParameterFilterContext context)
@@ -28,18 +37,17 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
         private void ApplyPropertyTags(OpenApiParameter parameter, ParameterFilterContext context)
         {
             var propertyMemberName = XmlCommentsNodeNameHelper.GetMemberNameForFieldOrProperty(context.PropertyInfo);
-            var propertyNode = _xmlNavigator.SelectSingleNode($"/doc/members/member[@name='{propertyMemberName}']");
 
-            if (propertyNode == null) return;
+            if (!_xmlDocMembers.TryGetValue(propertyMemberName, out var propertyNode)) return;
 
-            var summaryNode = propertyNode.SelectSingleNode("summary");
+            var summaryNode = propertyNode.SelectFirstChild("summary");
             if (summaryNode != null)
             {
-                parameter.Description = XmlCommentsTextHelper.Humanize(summaryNode.InnerXml);
+                parameter.Description = XmlCommentsTextHelper.Humanize(summaryNode.InnerXml, _options?.XmlCommentEndOfLine);
                 parameter.Schema.Description = null; // no need to duplicate
             }
 
-            var exampleNode = propertyNode.SelectSingleNode("example");
+            var exampleNode = propertyNode.SelectFirstChild("example");
             if (exampleNode == null) return;
 
             parameter.Example = XmlCommentsExampleHelper.Create(context.SchemaRepository, parameter.Schema, exampleNode.ToString());
@@ -57,14 +65,16 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
             if (targetMethod == null) return;
 
             var methodMemberName = XmlCommentsNodeNameHelper.GetMemberNameForMethod(targetMethod);
-            var paramNode = _xmlNavigator.SelectSingleNode(
-                $"/doc/members/member[@name='{methodMemberName}']/param[@name='{context.ParameterInfo.Name}']");
+
+            if (!_xmlDocMembers.TryGetValue(methodMemberName, out var propertyNode)) return;
+
+            XPathNavigator paramNode = propertyNode.SelectFirstChildWithAttribute("param", "name", context.ParameterInfo.Name);
 
             if (paramNode != null)
             {
-                parameter.Description = XmlCommentsTextHelper.Humanize(paramNode.InnerXml);
+                parameter.Description = XmlCommentsTextHelper.Humanize(paramNode.InnerXml, _options?.XmlCommentEndOfLine);
 
-                var example = paramNode.GetAttribute("example", "");
+                var example = paramNode.GetAttribute("example");
                 if (string.IsNullOrEmpty(example)) return;
 
                 parameter.Example = XmlCommentsExampleHelper.Create(context.SchemaRepository, parameter.Schema, example);

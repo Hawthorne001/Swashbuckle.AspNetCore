@@ -96,7 +96,7 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
 
             return DataContract.ForObject(
                 underlyingType: effectiveType,
-                properties: GetDataPropertiesFor(type, out Type extensionDataType),
+                properties: GetDataPropertiesFor(effectiveType, out Type extensionDataType),
                 extensionDataType: extensionDataType,
                 jsonConverter: (value) => JsonConverterFunc(value, effectiveType));
         }
@@ -141,6 +141,12 @@ namespace Swashbuckle.AspNetCore.SwaggerGen
                 return true;
             }
 #endif
+
+            if (type.IsArray)
+            {
+                itemType = type.GetElementType();
+                return true;
+            }
 
             if (typeof(IEnumerable).IsAssignableFrom(type))
             {

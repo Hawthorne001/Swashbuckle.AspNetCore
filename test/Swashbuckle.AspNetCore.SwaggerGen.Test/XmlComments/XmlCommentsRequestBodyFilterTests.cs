@@ -1,11 +1,12 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 using System.Xml.XPath;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.OpenApi.Models;
-using Xunit;
 using Swashbuckle.AspNetCore.TestSupport;
-using System.Collections.Generic;
+using Xunit;
 
 namespace Swashbuckle.AspNetCore.SwaggerGen.Test
 {
@@ -109,12 +110,73 @@ namespace Swashbuckle.AspNetCore.SwaggerGen.Test
             Assert.NotNull(requestBody.Content["application/json"].Example);
             Assert.Equal("\"https://test.com/a?b=1&c=2\"", requestBody.Content["application/json"].Example.ToJson());
         }
-        private XmlCommentsRequestBodyFilter Subject()
+
+        [Fact]
+        public void Apply_SetsDescription_ForParameterFromBody()
         {
-            using (var xmlComments = File.OpenText(typeof(FakeControllerWithXmlComments).Assembly.GetName().Name + ".xml"))
+            var requestBody = new OpenApiRequestBody
             {
-                return new XmlCommentsRequestBodyFilter(new XPathDocument(xmlComments));
-            }
+                Content = new Dictionary<string, OpenApiMediaType>
+                {
+                    ["application/json"] = new OpenApiMediaType { Schema = new OpenApiSchema { Type = "string" } }
+                }
+            };
+            var parameterInfo = typeof(FakeControllerWithXmlComments)
+                .GetMethod(nameof(FakeControllerWithXmlComments.PostBody))
+                .GetParameters()[0];
+            var bodyParameterDescription = new ApiParameterDescription
+            {
+                ParameterDescriptor = new ControllerParameterDescriptor { ParameterInfo = parameterInfo }
+            };
+            var filterContext = new RequestBodyFilterContext(bodyParameterDescription, null, null, null);
+
+            Subject().Apply(requestBody, filterContext);
+
+            Assert.Equal("Parameter from JSON body", requestBody.Description);
+        }
+
+        [Fact]
+        public void Apply_SetsDescription_ForParameterFromForm()
+        {
+            var parameterInfo = typeof(FakeControllerWithXmlComments)
+                .GetMethod(nameof(FakeControllerWithXmlComments.PostForm))
+                .GetParameters()[0];
+
+            var requestBody = new OpenApiRequestBody
+            {
+                Content = new Dictionary<string, OpenApiMediaType>
+                {
+                    ["multipart/form-data"] = new OpenApiMediaType
+                    {
+                        Schema = new OpenApiSchema
+                        {
+                            Type = "string",
+                            Properties = new Dictionary<string, OpenApiSchema>()
+                            {
+                                [parameterInfo.Name] = new()
+                            }
+                        },
+                    }
+                }
+            };
+
+            var bodyParameterDescription = new ApiParameterDescription
+            {
+                ParameterDescriptor = new ControllerParameterDescriptor { ParameterInfo = parameterInfo },
+                Name = parameterInfo.Name,
+                Source = BindingSource.Form
+            };
+            var filterContext = new RequestBodyFilterContext(null, [bodyParameterDescription], null, null);
+
+            Subject().Apply(requestBody, filterContext);
+
+            Assert.Equal("Parameter from form body", requestBody.Content["multipart/form-data"].Schema.Properties[parameterInfo.Name].Description);
+        }
+
+        private static XmlCommentsRequestBodyFilter Subject()
+        {
+            using var xmlComments = File.OpenText(typeof(FakeControllerWithXmlComments).Assembly.GetName().Name + ".xml");
+            return new XmlCommentsRequestBodyFilter(new XPathDocument(xmlComments));
         }
     }
 }

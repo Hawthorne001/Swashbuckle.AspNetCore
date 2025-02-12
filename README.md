@@ -7,7 +7,8 @@ Swashbuckle.AspNetCore
 
 [![Build status](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/actions/workflows/build.yml/badge.svg?branch=master&event=push)](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/actions?query=workflow%3Abuild+branch%3Amaster+event%3Apush) [![Code coverage](https://codecov.io/gh/domaindrivendev/Swashbuckle.AspNetCore/branch/master/graph/badge.svg)](https://codecov.io/gh/domaindrivendev/Swashbuckle.AspNetCore) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/domaindrivendev/Swashbuckle.AspNetCore/badge)](https://securityscorecards.dev/viewer/?uri=github.com/domaindrivendev/Swashbuckle.AspNetCore)
 
-[![NuGet](https://buildstats.info/nuget/Swashbuckle.AspNetCore)](https://www.nuget.org/packages/Swashbuckle.AspNetCore/ "Download Swashbuckle.AspNetCore from NuGet.org")
+[![NuGet](https://img.shields.io/nuget/v/Swashbuckle.AspNetCore?logo=nuget&label=Latest&color=blue)](https://www.nuget.org/packages/Swashbuckle.AspNetCore/ "Download Swashbuckle.AspNetCore from NuGet.org")
+[![NuGet](https://img.shields.io/nuget/dt/Swashbuckle.AspNetCore?logo=nuget&label=Downloads&color=blue)](https://www.nuget.org/packages/Swashbuckle.AspNetCore/ "Download Swashbuckle.AspNetCore from NuGet.org")
 
 [![Help Wanted](https://img.shields.io/github/issues/domaindrivendev/Swashbuckle.AspNetCore/help-wanted?style=flat&color=%24EC820&label=Help%20wanted)](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/labels/help-wanted)
 
@@ -23,12 +24,13 @@ Once you have an API that can describe itself in Swagger, you've opened the trea
 
 | Swashbuckle Version | ASP.NET Core | Swagger / OpenAPI Spec. | swagger-ui | Redoc UI |
 |----------|----------|----------|----------|----------|
-| [CI](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/commits/master/)|>= 2.0.0 | 2.0, 3.0 | [5.x.x](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/blob/master/src/Swashbuckle.AspNetCore.SwaggerUI/package.json#L6) | [2.x.x](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/blob/master/src/Swashbuckle.AspNetCore.ReDoc/package.json#L6) |
-| [6.6.2](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v6.6.2)|>= 2.0.0 | 2.0, 3.0 | 5.17.10 | 2.1.4 |
-| [5.6.3](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v5.6.3)|>= 2.0.0 | 2.0, 3.0 | 3.32.5 | 2.0.0-rc.40 |
-| [4.0.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v4.0.0)|>= 2.0.0, < 3.0.0 | 2.0 | 3.19.5 | 1.22.2 |
-| [3.0.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v3.0.0)|>= 1.0.4, < 3.0.0 | 2.0 | 3.17.1 | 1.20.0 |
-| [2.5.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v2.5.0)|>= 1.0.4, < 3.0.0 | 2.0 | 3.16.0 | 1.20.0 |
+| [CI](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/commits/master/) | >= 2.0.0 | 2.0, 3.0 | [5.x.x](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/blob/master/src/Swashbuckle.AspNetCore.SwaggerUI/package.json#L6) | [2.x.x](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/blob/master/src/Swashbuckle.AspNetCore.ReDoc/package.json#L6) |
+| [7.2.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v7.2.0) | >= 2.0.0 | 2.0, 3.0 | 5.18.2 | 2.2.0 |
+| [6.9.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v6.9.0) | >= 2.0.0 | 2.0, 3.0 | 5.17.14 | 2.1.5 |
+| [5.6.3](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v5.6.3) | >= 2.0.0 | 2.0, 3.0 | 3.32.5 | 2.0.0-rc.40 |
+| [4.0.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v4.0.0) | >= 2.0.0, < 3.0.0 | 2.0 | 3.19.5 | 1.22.2 |
+| [3.0.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v3.0.0) | >= 1.0.4, < 3.0.0 | 2.0 | 3.17.1 | 1.20.0 |
+| [2.5.0](https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/v2.5.0) | >= 1.0.4, < 3.0.0 | 2.0 | 3.16.0 | 1.20.0 |
 
 # Getting Started #
 
@@ -541,7 +543,6 @@ To enhance the generated docs with human-friendly descriptions, you can annotate
             }
          );
 
-         var filePath = Path.Combine(System.AppContext.BaseDirectory, "MyApi.xml");
          c.IncludeXmlComments(Assembly.GetExecutingAssembly());
          // or c.IncludeXmlComments(typeof(MyController).Assembly));
     }
@@ -564,8 +565,8 @@ To enhance the generated docs with human-friendly descriptions, you can annotate
     [ProducesResponseType(500)]
     public Product GetById(int id)
     ```
-    
-4. You can also annotate types with summary and example tags:
+
+4. Annotate your types with summary and example tags, other tags (remarks, para, etc.) are not supported:
 
     ```csharp
     public class Product
@@ -581,12 +582,12 @@ To enhance the generated docs with human-friendly descriptions, you can annotate
         /// </summary>
         /// <example>10</example>
         public int AvailableStock { get; set; }
-	
-	/// <summary>
+
+        /// <summary>
         /// The sizes the product is available in
         /// </summary>
         /// <example>["Small", "Medium", "Large"]</example>
-	public List<string> Sizes { get; set; }
+        public List<string> Sizes { get; set; }
     }
     ```
 
@@ -1166,7 +1167,8 @@ services.AddSwaggerGen(c =>
 });
 ```
 
-_NOTE: If you're using the [Swashbuckle Annotations library](#swashbuckleaspnetcoreannotations), it contains a custom selector that's based on the presence of `SwaggerSubType` attributes on base class definitions. This way, you can use simple attributes to explicitly list the inheritance and/or polymorphism relationships you want to expose. To enable this behavior, check out the [Annotations docs](#list-known-subtypes-for-inheritance-and-polymorphism)._
+> [!NOTE]
+> If you're using the [Swashbuckle Annotations library](#swashbuckleaspnetcoreannotations), it contains a custom selector that's based on the presence of `[JsonDerivedType]` (or `[SwaggerSubType]` for .NET 6 or earlier) attributes on base class definitions. This way, you can use simple attributes to explicitly list the inheritance and/or polymorphism relationships you want to expose. To enable this behavior, check out the [Annotations docs](#list-known-subtypes-for-inheritance-and-polymorphism).
 
 #### Describing Discriminators ####
 
@@ -1232,7 +1234,8 @@ services.AddSwaggerGen(c =>
 });
 ```
 
-_NOTE: If you're using the [Swashbuckle Annotations library](#swashbuckleaspnetcoreannotations), it contains custom selector functions that are based on the presence of `SwaggerDiscriminator` and `SwaggerSubType` attributes on base class definitions. This way, you can use simple attributes to explicitly provide discriminator metadata. To enable this behavior, check out the [Annotations docs](#enrich-polymorphic-base-classes-with-discriminator-metadata)._
+> [!NOTE]
+> If you're using the [Swashbuckle Annotations library](#swashbuckleaspnetcoreannotations), it contains custom selector functions that are based on the presence of `[JsonPolymorphic]` (or `[SwaggerDiscriminator]` for .NET 6 or earlier) and `[JsonDerivedType]` (or `[SwaggerSubType]` for .NET 6 or earlier) attributes on base class definitions. This way, you can use simple attributes to explicitly provide discriminator metadata. To enable this behavior, check out the [Annotations docs](#enrich-polymorphic-base-classes-with-discriminator-metadata).
 
 ## Swashbuckle.AspNetCore.SwaggerUI ##
 
@@ -1303,12 +1306,16 @@ app.UseSwaggerUI(c =>
     c.MaxDisplayedTags(5);
     c.ShowExtensions();
     c.ShowCommonExtensions();
+    c.Plugins = ["myCustomPlugin"];
     c.EnableValidator();
     c.SupportedSubmitMethods(SubmitMethod.Get, SubmitMethod.Head);
     c.UseRequestInterceptor("(request) => { return request; }");
     c.UseResponseInterceptor("(response) => { return response; }");
 });
 ```
+
+ > [!NOTE]
+ > When adding custom plugins, make sure you add any custom `js` files that define the plugin function(s).
 
 ### Inject Custom JavaScript ###
 
@@ -1536,6 +1543,15 @@ services.AddSwaggerGen(c =>
 });
 
 // Shape.cs
+
+// .NET 7 or later
+[JsonDerivedType(typeof(Rectangle))]
+[JsonDerivedType(typeof(Circle))]
+public abstract class Shape
+{
+}
+
+// .NET 6 or earlier
 [SwaggerSubType(typeof(Rectangle))]
 [SwaggerSubType(typeof(Circle))]
 public abstract class Shape
@@ -1545,7 +1561,7 @@ public abstract class Shape
 
 ### Enrich Polymorphic Base Classes with Discriminator Metadata ###
 
-If you're using annotations to _explicitly_ indicate the "known" subtypes for a polymorphic base type, you can combine the `SwaggerDiscriminatorAttribute` with the `SwaggerSubTypeAttribute` to provide additional metadata about the "discriminator" property, which will then be incorporated into the generated schema definition:
+If you're using annotations to _explicitly_ indicate the "known" subtypes for a polymorphic base type, you can combine the `JsonPolymorphicAttribute` with the `JsonDerivedTypeAttribute` to provide additional metadata about the "discriminator" property, which will then be incorporated into the generated schema definition:
 
 
 ```csharp
@@ -1556,12 +1572,32 @@ services.AddSwaggerGen(c =>
 });
 
 // Shape.cs
+
+// .NET 7 or later
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "shapeType")]
+[JsonDerivedType(typeof(Rectangle), "rectangle")]
+[JsonDerivedType(typeof(Circle), "circle")]
+public abstract class Shape
+{
+    // Avoid using a JsonPolymorphicAttribute.TypeDiscriminatorPropertyName
+    // that conflicts with a property in your type hierarchy.
+    // Related issue: https://github.com/dotnet/runtime/issues/72170
+}
+
+// .NET 6 or earlier
 [SwaggerDiscriminator("shapeType")]
 [SwaggerSubType(typeof(Rectangle), DiscriminatorValue = "rectangle")]
 [SwaggerSubType(typeof(Circle), DiscriminatorValue = "circle")]
 public abstract class Shape
 {
-    public ShapeType { get; set; }
+    public ShapeType ShapeType { get; set; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ShapeType
+{
+    Circle,
+    Rectangle
 }
 ```
 
